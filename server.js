@@ -67,8 +67,9 @@ log
 const express = require('express')
 const app = express()
 const cors = require('cors')
-const fetch = require("node-fetch")
+
 const bodyParser = require('body-parser');
+const axios = require('axios');
 
 require('dotenv').config()
 
@@ -106,9 +107,21 @@ app.get('/', (req, res) => {
 });
 
 app.get("/api/users", async function(req,res){
-let userList = await fetch("https://extracker-d19f9-default-rtdb.firebaseio.com/users.json").then(data=>data.json())
-.then(data => Object.values(data))
-res.send(userList)
+let userList = await axios.get("https://extracker-d19f9-default-rtdb.firebaseio.com/users.json")
+let userElements = await Object.values(userList.data)
+
+let test= await Object.keys(userList.data)
+console.log(test)
+
+let output = await userElements.map(data => {
+
+return {"username": data.username, "_id": data._id }
+
+})
+
+
+let finalOutput= await res.json(Object.values(output))
+
 }
 
 )
@@ -116,10 +129,13 @@ res.send(userList)
 app.get("/api/users/:_id/logs", async function(req,res){
   let _id= req.params._id
  
-  let exerciseList = await fetch(`https://extracker-d19f9-default-rtdb.firebaseio.com/users/${_id}/exercises.json`)
-  .then(data => data.json()).then(data=> Object.values(data))
+  let exerciseList = await axios.get(`https://extracker-d19f9-default-rtdb.firebaseio.com/users/${_id}/exercises.json`).then(response => response.data).then(response=> Object.values(response))
+
+  
 
   let exerciseCount = await exerciseList.length
+
+  let test = await console.log(exerciseList , exerciseCount )
 
   let exerciseOutput = await exerciseList.map(item =>{ return {"description" : item.description, "date": item.date, "duration" : parseInt(item.duration)} })
   let username = await exerciseList.map(item=> item.username)
@@ -168,15 +184,18 @@ app.get("/api/users/:_id/logs", async function(req,res){
 app.post("/api/users", async function(req,res){
 let username = req.body.username
  
-  let firstPost = await fetch("https://extracker-d19f9-default-rtdb.firebaseio.com/users.json", {method: 'POST', body: JSON.stringify({"username": username}),
-	headers: {'Content-Type': 'application/json'}})
-  let uniqueIdPost = await fetch("https://extracker-d19f9-default-rtdb.firebaseio.com/users.json").then(data=>data.json())
-  .then(data => Object.keys(data)).then(data => data[data.length-1])
-  console.log(uniqueIdPost)
-  let finalPatch = await fetch(`https://extracker-d19f9-default-rtdb.firebaseio.com/users/${uniqueIdPost}.json`, {method: 'PUT', body: JSON.stringify({"username": username, "_id": uniqueIdPost}),
-	headers: {'Content-Type': 'application/json'}})
+  let firstPost = await axios.post("https://extracker-d19f9-default-rtdb.firebaseio.com/users.json", {"username": username})
 
-  let output = await res.json({"username":username,"_id": uniqueIdPost})
+  let userList = await axios.get("https://extracker-d19f9-default-rtdb.firebaseio.com/users.json")
+  let userElements = await Object.values(userList.data)
+
+  let userIds= await Object.keys(userList.data)
+
+  let out = await userIds[userIds.length-1]
+
+  let finalPatch = await axios.put(`https://extracker-d19f9-default-rtdb.firebaseio.com/users/${out}.json`, {"username": username, "_id": out})
+
+  let output = await res.json({"username":username,"_id": out})
 
 });
   
@@ -197,9 +216,8 @@ if(!date){
   date = givenDate.toDateString();
 }
 
-let findUser= await fetch(`https://extracker-d19f9-default-rtdb.firebaseio.com/users.json`)
-.then(data => data.json())
-.then(data => Object.values(data))
+let findUser= await axios.get(`https://extracker-d19f9-default-rtdb.firebaseio.com/users.json`)
+.then(response => Object.values(response.data))
 
 let filterUser= await findUser.filter(data => data["_id"]== _id)
 
@@ -207,8 +225,7 @@ let foundUsername = filterUser[0].username
 let exercisePostBody= await {"_id":_id,"username":foundUsername, description,"duration" : parseInt(duration),date}
 console.log(exercisePostBody)
 
-let exercisePost = await fetch(`https://extracker-d19f9-default-rtdb.firebaseio.com/users/${_id}/exercises.json`,{method: 'POST', body: JSON.stringify(exercisePostBody),
-headers: {'Content-Type': 'application/json'}})
+let exercisePost = await axios.post(`https://extracker-d19f9-default-rtdb.firebaseio.com/users/${_id}/exercises.json`,exercisePostBody)
 
 let exerciseOutput = Object.values(exercisePostBody)
 
@@ -223,7 +240,7 @@ let sendResult = res.json({"_id":_id,"username":foundUsername, description,"dura
 
 
 
-const listener = app.listen(process.env.PORT || 4000 , () => {
+const listener = app.listen(process.env.PORT || 8000 , () => {
   console.log('Your app is listening on port ' + listener.address().port)
 })
 
